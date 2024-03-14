@@ -1,0 +1,38 @@
+apiVersion: webhook.upbound.io/v1alpha1
+kind: Webhook
+metadata:
+  annotations:
+    meta.upbound.io/example-id: webhook/v1alpha1/webhook
+  labels:
+    testing.upbound.io/example-name: foo
+  name: foo
+spec:
+  forProvider:
+    active: false
+    configuration:
+    - contentType: form
+      insecureSsl: false
+      urlSecretRef:
+        key: example-key
+        name: example-secret
+        namespace: upbound-system
+    events:
+    - issues
+    repository: example
+
+---
+
+apiVersion: repo.upbound.io/v1alpha1
+kind: Repository
+metadata:
+  annotations:
+    meta.upbound.io/example-id: webhook/v1alpha1/webhook
+  labels:
+    testing.upbound.io/example-name: repo
+  name: repo
+spec:
+  forProvider:
+    description: Terraform acceptance tests
+    homepageUrl: http://example.com/
+    name: foo
+    visibility: public

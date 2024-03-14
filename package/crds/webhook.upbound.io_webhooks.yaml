@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: resources.null.template.upbound.io
+  name: webhooks.webhook.upbound.io
 spec:
-  group: null.template.upbound.io
+  group: webhook.upbound.io
   names:
     categories:
     - crossplane
     - managed
-    - template
-    kind: Resource
-    listKind: ResourceList
-    plural: resources
-    singular: resource
+    - github
+    kind: Webhook
+    listKind: WebhookList
+    plural: webhooks
+    singular: webhook
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,10 +34,8 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Resource is the Schema for the Resources API. The null_resource
-          resource implements the standard resource lifecycle but takes no further
-          action. The triggers argument allows specifying an arbitrary set of values
-          that, when changed, will cause the resource to be replaced.
+        description: Webhook is the Schema for the Webhooks API. Creates and manages
+          repository webhooks within GitHub organizations or personal accounts
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -52,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ResourceSpec defines the desired state of Resource
+            description: WebhookSpec defines the desired state of Webhook
             properties:
               deletionPolicy:
                 default: Delete
@@ -69,13 +67,75 @@ spec:
                 type: string
               forProvider:
                 properties:
-                  triggers:
-                    additionalProperties:
+                  active:
+                    description: Indicate if the webhook should receive events. Defaults
+                      to true. Indicate if the webhook should receive events. Defaults
+                      to 'true'.
+                    type: boolean
+                  configuration:
+                    description: Configuration block for the webhook. Detailed below.
+                      Configuration for the webhook.
+                    items:
+                      properties:
+                        contentType:
+                          description: The content type for the payload. Valid values
+                            are either form or json. The content type for the payload.
+                            Valid values are either 'form' or 'json'.
+                          type: string
+                        insecureSsl:
+                          description: Insecure SSL boolean toggle. Defaults to false.
+                            Insecure SSL boolean toggle. Defaults to 'false'.
+                          type: boolean
+                        secretSecretRef:
+                          description: The shared secret for the webhook. See API
+                            documentation. The shared secret for the webhook
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: Name of the secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the secret.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                        urlSecretRef:
+                          description: The URL of the webhook. The URL of the webhook.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              description: Name of the secret.
+                              type: string
+                            namespace:
+                              description: Namespace of the secret.
+                              type: string
+                          required:
+                          - key
+                          - name
+                          - namespace
+                          type: object
+                      required:
+                      - urlSecretRef
+                      type: object
+                    type: array
+                  events:
+                    description: A list of events which should trigger the webhook.
+                      See a list of available events. A list of events which should
+                      trigger the webhook
+                    items:
                       type: string
-                    description: A map of arbitrary strings that, when changed, will
-                      force the null resource to be replaced, re-running any associated
-                      provisioners.
-                    type: object
+                    type: array
+                  repository:
+                    description: The repository of the webhook. The repository of
+                      the webhook.
+                    type: string
                 type: object
               initProvider:
                 description: THIS IS A BETA FIELD. It will be honored unless the Management
@@ -89,13 +149,38 @@ spec:
                   for example because of an external controller is managing them,
                   like an autoscaler.
                 properties:
-                  triggers:
-                    additionalProperties:
+                  active:
+                    description: Indicate if the webhook should receive events. Defaults
+                      to true. Indicate if the webhook should receive events. Defaults
+                      to 'true'.
+                    type: boolean
+                  configuration:
+                    description: Configuration block for the webhook. Detailed below.
+                      Configuration for the webhook.
+                    items:
+                      properties:
+                        contentType:
+                          description: The content type for the payload. Valid values
+                            are either form or json. The content type for the payload.
+                            Valid values are either 'form' or 'json'.
+                          type: string
+                        insecureSsl:
+                          description: Insecure SSL boolean toggle. Defaults to false.
+                            Insecure SSL boolean toggle. Defaults to 'false'.
+                          type: boolean
+                      type: object
+                    type: array
+                  events:
+                    description: A list of events which should trigger the webhook.
+                      See a list of available events. A list of events which should
+                      trigger the webhook
+                    items:
                       type: string
-                    description: A map of arbitrary strings that, when changed, will
-                      force the null resource to be replaced, re-running any associated
-                      provisioners.
-                    type: object
+                    type: array
+                  repository:
+                    description: The repository of the webhook. The repository of
+                      the webhook.
+                    type: string
                 type: object
               managementPolicies:
                 default:
@@ -257,20 +342,61 @@ spec:
             required:
             - forProvider
             type: object
+            x-kubernetes-validations:
+            - message: spec.forProvider.events is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.events)
+                || (has(self.initProvider) && has(self.initProvider.events))'
+            - message: spec.forProvider.repository is a required parameter
+              rule: '!(''*'' in self.managementPolicies || ''Create'' in self.managementPolicies
+                || ''Update'' in self.managementPolicies) || has(self.forProvider.repository)
+                || (has(self.initProvider) && has(self.initProvider.repository))'
           status:
-            description: ResourceStatus defines the observed state of Resource.
+            description: WebhookStatus defines the observed state of Webhook.
             properties:
               atProvider:
                 properties:
+                  active:
+                    description: Indicate if the webhook should receive events. Defaults
+                      to true. Indicate if the webhook should receive events. Defaults
+                      to 'true'.
+                    type: boolean
+                  configuration:
+                    description: Configuration block for the webhook. Detailed below.
+                      Configuration for the webhook.
+                    items:
+                      properties:
+                        contentType:
+                          description: The content type for the payload. Valid values
+                            are either form or json. The content type for the payload.
+                            Valid values are either 'form' or 'json'.
+                          type: string
+                        insecureSsl:
+                          description: Insecure SSL boolean toggle. Defaults to false.
+                            Insecure SSL boolean toggle. Defaults to 'false'.
+                          type: boolean
+                      type: object
+                    type: array
+                  etag:
+                    type: string
+                  events:
+                    description: A list of events which should trigger the webhook.
+                      See a list of available events. A list of events which should
+                      trigger the webhook
+                    items:
+                      type: string
+                    type: array
                   id:
                     type: string
-                  triggers:
-                    additionalProperties:
-                      type: string
-                    description: A map of arbitrary strings that, when changed, will
-                      force the null resource to be replaced, re-running any associated
-                      provisioners.
-                    type: object
+                  repository:
+                    description: The repository of the webhook. The repository of
+                      the webhook.
+                    type: string
+                  url:
+                    description: URL of the webhook.  This is a sensitive attribute
+                      because it may include basic auth credentials. Configuration
+                      block for the webhook
+                    type: string
                 type: object
               conditions:
                 description: Conditions of the resource.

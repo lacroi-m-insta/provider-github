@@ -1,4 +1,4 @@
-module github.com/upbound/upjet-provider-template
+module github.com/lacroi-m-insta/provider-github
 
 go 1.19
 
