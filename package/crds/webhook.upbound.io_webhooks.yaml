@@ -77,6 +77,9 @@ spec:
                       Configuration for the webhook.
                     items:
                       properties:
+                        url:
+                          description: callback url for the webhook
+                          type: string
                         contentType:
                           description: The content type for the payload. Valid values
                             are either form or json. The content type for the payload.

@@ -1,7 +1,3 @@
-/*
-Copyright 2022 Upbound Inc.
-*/
-
 package config
 
 import "github.com/crossplane/upjet/pkg/config"
