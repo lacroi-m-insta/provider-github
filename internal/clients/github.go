@@ -2,7 +2,6 @@ package clients
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/pkg/errors"
@@ -25,76 +24,8 @@ const (
 	errTerraformProviderMissingOwner = "github provider app_auth needs owner key to be set"
 
 	// provider config variables
-	keyBaseURL               = "base_url"
-	keyOwner                 = "owner"
-	keyToken                 = "token"
-	keyAppAuth               = "app_auth"
-	keyAppAuthID             = "id"
-	keyAppAuthInstallationID = "installation_id"
-	keyAppAuthPemFile        = "pem_file"
-	keyWriteDelayMs          = "write_delay_ms"
-	keyReadDelayMs           = "read_delay_ms"
+	keyToken = "token"
 )
-
-type appAuth struct {
-	ID             string `json:"id"`
-	InstallationID string `json:"installation_id"`
-	AuthPemFile    string `json:"pem_file"`
-}
-
-type githubConfig struct {
-	BaseURL      *string    `json:"base_url,omitempty"`
-	Owner        *string    `json:"owner,omitempty"`
-	Token        *string    `json:"token,omitempty"`
-	AppAuth      *[]appAuth `json:"app_auth,omitempty"`
-	WriteDelayMs *int       `json:"write_delay_ms,omitempty"`
-	ReadDelayMs  *int       `json:"read_delay_ms,omitempty"`
-}
-
-func terraformProviderConfigurationBuilder(creds githubConfig) (terraform.ProviderConfiguration, error) {
-
-	cnf := terraform.ProviderConfiguration{}
-
-	if creds.BaseURL != nil {
-		cnf[keyBaseURL] = *creds.BaseURL
-	}
-
-	if creds.Owner != nil {
-		cnf[keyOwner] = *creds.Owner
-	}
-
-	if creds.Token != nil {
-		cnf[keyToken] = *creds.Token
-	}
-
-	if creds.AppAuth != nil {
-		if creds.Owner == nil {
-			return cnf, errors.Errorf(errTerraformProviderMissingOwner)
-		}
-
-		aaList := []map[string]any{}
-
-		aa := map[string]any{
-			keyAppAuthID:             (*creds.AppAuth)[0].ID,
-			keyAppAuthInstallationID: (*creds.AppAuth)[0].InstallationID,
-			keyAppAuthPemFile:        (*creds.AppAuth)[0].AuthPemFile,
-		}
-
-		aaList = append(aaList, aa)
-		cnf[keyAppAuth] = aaList
-	}
-
-	if creds.WriteDelayMs != nil {
-		cnf[keyWriteDelayMs] = *creds.WriteDelayMs
-	}
-
-	if creds.ReadDelayMs != nil {
-		cnf[keyReadDelayMs] = *creds.ReadDelayMs
-	}
-
-	return cnf, nil
-
-}
 
 // TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
 // returns Terraform provider setup configuration
@@ -122,22 +53,15 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.Wrap(err, errTrackUsage)
 		}
 
-		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, client, pc.Spec.Credentials.CommonCredentialSelectors)
+		token, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, client, pc.Spec.Credentials.CommonCredentialSelectors)
 		if err != nil {
 			return ps, errors.Wrap(err, errExtractCredentials)
 		}
 
-		creds := githubConfig{}
-		if err := json.Unmarshal(data, &creds); err != nil {
-			return ps, errors.Wrap(err, errUnmarshalCredentials)
-		}
-
 		// set provider configuration
-		ps.Configuration, err = terraformProviderConfigurationBuilder(creds)
-		if err != nil {
-			return ps, errors.Wrap(err, errProviderConfigurationBuilder)
-		}
-
+		cnf := terraform.ProviderConfiguration{}
+		cnf[keyToken] = string(token)
+		ps.Configuration = cnf
 		return ps, nil
 	}
 }
