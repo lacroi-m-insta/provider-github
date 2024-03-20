@@ -5,7 +5,11 @@ metadata:
   namespace: crossplane
 type: Opaque
 stringData:
-  credentials: ghp_abcdefghijklmop
+  credentials: |
+    {
+      "token": "toto",
+      "owner": "instadeep-vbr"
+    }
   url: "https://dataplane.webhook.domain"
 ---
 apiVersion: github.upbound.io/v1beta1
@@ -20,7 +24,6 @@ spec:
       namespace: crossplane
       key: credentials
 ---
-
 apiVersion: webhook.upbound.io/v1alpha1
 kind: Webhook
 metadata:
@@ -28,7 +31,7 @@ metadata:
     meta.upbound.io/example-id: webhook/v1alpha1/webhook
   labels:
     testing.upbound.io/example-name: web
-  name: gh-project
+  name: aichor-demo
 spec:
   forProvider:
     active: false
@@ -45,4 +48,4 @@ spec:
           namespace: crossplane
     events:
     - commit_comment
-    repository: gh-project
+    repository: aichor-demo

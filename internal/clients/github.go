@@ -11,6 +11,8 @@ import (
 	"github.com/crossplane/upjet/pkg/terraform"
 
 	"github.com/lacroi-m-insta/provider-github/apis/v1beta1"
+	"encoding/json"
+
 )
 
 const (
@@ -22,10 +24,28 @@ const (
 	errUnmarshalCredentials          = "cannot unmarshal github credentials as JSON"
 	errProviderConfigurationBuilder  = "cannot build configuration for terraform provider block"
 	errTerraformProviderMissingOwner = "github provider app_auth needs owner key to be set"
-
-	// provider config variables
-	keyToken = "token"
+	keyOwner                         = "owner"
+	keyToken                         = "token"
+	
 )
+
+type githubConfig struct {
+	Owner *string `json:"owner,omitempty"`
+	Token *string `json:"token,omitempty"`
+}
+
+func terraformProviderConfigurationBuilder(creds githubConfig) (terraform.ProviderConfiguration, error) {
+	cnf := terraform.ProviderConfiguration{}
+
+	if creds.Owner != nil {
+		cnf[keyOwner] = *creds.Owner
+	}
+
+	if creds.Token != nil {
+		cnf[keyToken] = *creds.Token
+	}
+	return cnf, nil
+}
 
 // TerraformSetupBuilder builds Terraform a terraform.SetupFn function which
 // returns Terraform provider setup configuration
@@ -53,15 +73,20 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.Wrap(err, errTrackUsage)
 		}
 
-		token, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, client, pc.Spec.Credentials.CommonCredentialSelectors)
+		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, client, pc.Spec.Credentials.CommonCredentialSelectors)
 		if err != nil {
 			return ps, errors.Wrap(err, errExtractCredentials)
 		}
 
-		// set provider configuration
-		cnf := terraform.ProviderConfiguration{}
-		cnf[keyToken] = string(token)
-		ps.Configuration = cnf
+		creds := githubConfig{}
+		if err := json.Unmarshal(data, &creds); err != nil {
+			return ps, errors.Wrap(err, errUnmarshalCredentials)
+		}
+
+		ps.Configuration, err = terraformProviderConfigurationBuilder(creds)
+		if err != nil {
+			return ps, errors.Wrap(err, errProviderConfigurationBuilder)
+		}
 		return ps, nil
 	}
 }
