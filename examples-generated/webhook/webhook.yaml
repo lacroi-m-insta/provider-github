@@ -12,18 +12,6 @@ stringData:
     }
   url: "https://dataplane.webhook.domain"
 ---
-apiVersion: github.upbound.io/v1beta1
-kind: ProviderConfig
-metadata:
-  name: default
-spec:
-  credentials:
-    source: Secret
-    secretRef:
-      name: github-secret
-      namespace: crossplane
-      key: credentials
----
 apiVersion: webhook.upbound.io/v1alpha1
 kind: Webhook
 metadata:

@@ -2,17 +2,15 @@ package clients
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/upjet/pkg/terraform"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/crossplane/upjet/pkg/terraform"
-
-	"github.com/lacroi-m-insta/provider-github/apis/v1beta1"
-	"encoding/json"
-
+	"k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
 )
 
 const (
@@ -26,7 +24,6 @@ const (
 	errTerraformProviderMissingOwner = "github provider app_auth needs owner key to be set"
 	keyOwner                         = "owner"
 	keyToken                         = "token"
-	
 )
 
 type githubConfig struct {
@@ -63,12 +60,13 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 		if configRef == nil {
 			return ps, errors.New(errNoProviderConfig)
 		}
-		pc := &v1beta1.ProviderConfig{}
+
+		pc := &v1beta1.WebhookClientConfigApplyConfiguration{}
 		if err := client.Get(ctx, types.NamespacedName{Name: configRef.Name}, pc); err != nil {
 			return ps, errors.Wrap(err, errGetProviderConfig)
 		}
 
-		t := resource.NewProviderConfigUsageTracker(client, &v1beta1.ProviderConfigUsage{})
+		t := resource.NewProviderConfigUsageTracker(client, &v1beta1.WebhookClientConfigApplyConfiguration{})
 		if err := t.Track(ctx, mg); err != nil {
 			return ps, errors.Wrap(err, errTrackUsage)
 		}

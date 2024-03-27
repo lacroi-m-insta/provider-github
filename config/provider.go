@@ -6,7 +6,6 @@ import (
 
 	ujconfig "github.com/crossplane/upjet/pkg/config"
 
-	"github.com/lacroi-m-insta/provider-github/config/repository"
 	"github.com/lacroi-m-insta/provider-github/config/repositorywebhook"
 )
 
@@ -33,7 +32,6 @@ func GetProvider() *ujconfig.Provider {
 
 	for _, configure := range []func(provider *ujconfig.Provider){
 		// add custom config functions
-		repository.Configure,
 		repositorywebhook.Configure,
 	} {
 		configure(pc)

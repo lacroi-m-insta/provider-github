@@ -9,8 +9,6 @@ import (
 
 	"github.com/crossplane/upjet/pkg/controller"
 
-	providerconfig "github.com/lacroi-m-insta/provider-github/internal/controller/providerconfig"
-	repository "github.com/lacroi-m-insta/provider-github/internal/controller/repo/repository"
 	webhook "github.com/lacroi-m-insta/provider-github/internal/controller/webhook/webhook"
 )
 
@@ -18,8 +16,6 @@ import (
 // the supplied manager.
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
-		providerconfig.Setup,
-		repository.Setup,
 		webhook.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
