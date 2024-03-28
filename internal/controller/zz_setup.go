@@ -9,7 +9,7 @@ import (
 
 	"github.com/crossplane/upjet/pkg/controller"
 
-	webhook "github.com/lacroi-m-insta/provider-github/internal/controller/webhook/webhook"
+	webhook "github.com/lacroi-m-insta/provider-github/internal/controller/hook/webhook"
 )
 
 // Setup creates all controllers with the supplied logger and adds them to

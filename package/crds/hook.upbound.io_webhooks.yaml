@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.13.0
-  name: webhooks.webhook.upbound.io
+  name: webhooks.hook.upbound.io
 spec:
-  group: webhook.upbound.io
+  group: hook.upbound.io
   names:
     categories:
     - crossplane

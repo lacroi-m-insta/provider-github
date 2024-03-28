@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 	"github.com/crossplane/upjet/pkg/terraform"
+	"github.com/k0kubun/pp/v3"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/apiextensions/v1beta1"
+	hook "github.com/lacroi-m-insta/provider-github/apis/hook/v1alpha1"
 )
 
 const (
@@ -61,20 +63,43 @@ func TerraformSetupBuilder(version, providerSource, providerVersion string) terr
 			return ps, errors.New(errNoProviderConfig)
 		}
 
-		pc := &v1beta1.WebhookClientConfigApplyConfiguration{}
+		pc := &hook.Webhook{}
 		if err := client.Get(ctx, types.NamespacedName{Name: configRef.Name}, pc); err != nil {
 			return ps, errors.Wrap(err, errGetProviderConfig)
 		}
 
-		t := resource.NewProviderConfigUsageTracker(client, &v1beta1.WebhookClientConfigApplyConfiguration{})
-		if err := t.Track(ctx, mg); err != nil {
-			return ps, errors.Wrap(err, errTrackUsage)
+		// For secretSecretRef
+		selectorCreds := xpv1.CommonCredentialSelectors{
+			SecretRef: &xpv1.SecretKeySelector{
+				SecretReference: xpv1.SecretReference{
+					Name:      pc.Spec.ForProvider.Configuration[0].SecretSecretRef.Name,
+					Namespace: pc.Spec.ForProvider.Configuration[0].SecretSecretRef.Namespace,
+				},
+				Key: pc.Spec.ForProvider.Configuration[0].SecretSecretRef.Key,
+			},
 		}
 
-		data, err := resource.CommonCredentialExtractor(ctx, pc.Spec.Credentials.Source, client, pc.Spec.Credentials.CommonCredentialSelectors)
+		// For urlSecretRef
+		/*
+			selectorUrl := xpv1.CommonCredentialSelectors{
+				SecretRef: &xpv1.SecretKeySelector{
+					SecretReference: xpv1.SecretReference{
+						Name:      pc.Spec.ForProvider.Configuration[0].URLSecretRef.Name,
+						Namespace: pc.Spec.ForProvider.Configuration[0].URLSecretRef.Namespace,
+					},
+					Key: pc.Spec.ForProvider.Configuration[0].URLSecretRef.Key,
+				},
+			}
+		*/
+
+		data, err := resource.CommonCredentialExtractor(ctx, xpv1.CredentialsSourceSecret, client, selectorCreds)
 		if err != nil {
 			return ps, errors.Wrap(err, errExtractCredentials)
 		}
+
+		pp.Println("===============================================")
+		pp.Println(data)
+		pp.Println("===============================================")
 
 		creds := githubConfig{}
 		if err := json.Unmarshal(data, &creds); err != nil {
