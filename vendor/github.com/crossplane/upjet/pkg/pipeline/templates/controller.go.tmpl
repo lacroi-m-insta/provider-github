@@ -1,0 +1,77 @@
+// SPDX-FileCopyrightText: 2023 The Crossplane Authors <https://crossplane.io>
+//
+// SPDX-License-Identifier: Apache-2.0
+
+{{ .Header }}
+
+{{ .GenStatement }}
+
+package {{ .Package }}
+
+import (
+	"time"
+
+	"github.com/crossplane/crossplane-runtime/pkg/connection"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	xpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/crossplane/upjet/pkg/controller/handler"
+	tjcontroller "github.com/crossplane/upjet/pkg/controller"
+	"github.com/crossplane/upjet/pkg/terraform"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	{{ .Imports }}
+)
+
+// Setup adds a controller that reconciles {{ .CRD.Kind }} managed resources.
+func Setup(mgr ctrl.Manager, o tjcontroller.Options) error {
+	name := managed.ControllerName({{ .TypePackageAlias }}{{ .CRD.Kind }}_GroupVersionKind.String())
+	var initializers managed.InitializerChain
+	{{- if .Initializers }}
+	for _, i := range o.Provider.Resources["{{ .ResourceType }}"].InitializerFns {
+	    initializers = append(initializers,i(mgr.GetClient()))
+	}
+	{{- end}}
+	{{- if not .DisableNameInitializer }}
+	initializers = append(initializers, managed.NewNameAsExternalName(mgr.GetClient()))
+	{{- end}}
+	cps := []managed.ConnectionPublisher{managed.NewAPISecretPublisher(mgr.GetClient(), mgr.GetScheme())}
+	if o.SecretStoreConfigGVK != nil {
+		cps = append(cps, connection.NewDetailsManager(mgr.GetClient(), *o.SecretStoreConfigGVK, connection.WithTLSConfig(o.ESSOptions.TLSConfig)))
+	}
+	eventHandler := handler.NewEventHandler(handler.WithLogger(o.Logger.WithValues("gvk", {{ .TypePackageAlias }}{{ .CRD.Kind }}_GroupVersionKind)))
+	{{- if .UseAsync }}
+	ac := tjcontroller.NewAPICallbacks(mgr, xpresource.ManagedKind({{ .TypePackageAlias }}{{ .CRD.Kind }}_GroupVersionKind), tjcontroller.WithEventHandler(eventHandler))
+	{{- end}}
+	opts := []managed.ReconcilerOption{
+		managed.WithExternalConnecter(tjcontroller.NewConnector(mgr.GetClient(), o.WorkspaceStore, o.SetupFn, o.Provider.Resources["{{ .ResourceType }}"], tjcontroller.WithLogger(o.Logger), tjcontroller.WithConnectorEventHandler(eventHandler),
+			{{- if .UseAsync }}
+			tjcontroller.WithCallbackProvider(ac),
+			{{- end}}
+		)),
+		managed.WithLogger(o.Logger.WithValues("controller", name)),
+		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
+		managed.WithFinalizer(terraform.NewWorkspaceFinalizer(o.WorkspaceStore, xpresource.NewAPIFinalizer(mgr.GetClient(), managed.FinalizerName))),
+		managed.WithTimeout(3*time.Minute),
+		managed.WithInitializers(initializers),
+		managed.WithConnectionPublishers(cps...),
+		managed.WithPollInterval(o.PollInterval),
+	}
+	if o.PollJitter != 0 {
+	    opts = append(opts, managed.WithPollJitterHook(o.PollJitter))
+	}
+	{{- if .FeaturesPackageAlias }}
+	if o.Features.Enabled({{ .FeaturesPackageAlias }}EnableBetaManagementPolicies) {
+		opts = append(opts, managed.WithManagementPolicies())
+	}
+	{{- end}}
+	r := managed.NewReconciler(mgr, xpresource.ManagedKind({{ .TypePackageAlias }}{{ .CRD.Kind }}_GroupVersionKind), opts...)
+
+	return ctrl.NewControllerManagedBy(mgr).
+		Named(name).
+		WithOptions(o.ForControllerRuntime()).
+		WithEventFilter(xpresource.DesiredStateChanged()).
+		Watches(&{{ .TypePackageAlias }}{{ .CRD.Kind }}{}, eventHandler).
+		Complete(ratelimiter.NewReconciler(name, r, o.GlobalRateLimiter))
+}
