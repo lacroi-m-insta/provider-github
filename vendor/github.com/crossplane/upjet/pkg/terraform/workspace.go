@@ -173,14 +173,17 @@ func (w *Workspace) ApplyAsync(callback CallbackFn) error {
 	go func() {
 		defer cancel()
 		out, err := w.runTF(ctx, ModeASync, "apply", "-auto-approve", "-input=false", "-lock=false", "-json")
-		if err != nil {
-			err = tferrors.NewApplyFailed(out)
+		// Hack to stop reconsilation
+		if out != nil {
+			if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
+				w.logger.Debug("blocking ")
+				w.LastOperation.MarkStart("END 401 Bad credentials or 403 API rate limit ")
+				return
+			}
 		}
 
-		// Hack
-		if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
-			w.LastOperation.MarkStart("END 401 Bad credentials or 403 API rate limit ")
-			return
+		if err != nil {
+			err = tferrors.NewApplyFailed(out)
 		}
 
 		w.LastOperation.MarkEnd()
@@ -284,18 +287,23 @@ func (w *Workspace) Refresh(ctx context.Context) (RefreshResult, error) {
 	case w.LastOperation.IsEnded():
 		defer w.LastOperation.Flush()
 	}
+
 	out, err := w.runTF(ctx, ModeSync, "apply", "-refresh-only", "-auto-approve", "-input=false", "-lock=false", "-json")
+
+	// Hack to stop reconsilation
+	if out != nil {
+		if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
+			w.logger.Debug("blocking ")
+			w.LastOperation.MarkStart("END 401 Bad credentials or 403 API rate limit ")
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Reason: metav1.StatusReasonUnauthorized,
+			}}
+		}
+	}
+
 	w.logger.Debug("refresh ended", "out", w.filterFn(string(out)))
 	if err != nil {
 		return RefreshResult{}, tferrors.NewRefreshFailed(out)
-	}
-
-	// Hack
-	if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
-		k8sError := &k8serrors.StatusError{ErrStatus: metav1.Status{
-			Reason: metav1.StatusReasonUnauthorized,
-		}}
-		return RefreshResult{}, k8sError
 	}
 
 	raw, err := w.fs.ReadFile(filepath.Join(w.dir, "terraform.tfstate"))
