@@ -175,11 +175,27 @@ func (w *Workspace) ApplyAsync(callback CallbackFn) error {
 		out, err := w.runTF(ctx, ModeASync, "apply", "-auto-approve", "-input=false", "-lock=false", "-json")
 		// Hack to stop reconsilation
 		if out != nil {
-			if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
-				w.logger.Debug("blocking ")
-				w.LastOperation.MarkStart("END 401 Bad credentials or 403 API rate limit ")
+			str401 := strings.Contains(string(out), "401 Bad credentials")
+			str403 := strings.Contains(string(out), "403 API rate limit")
+			str422 := strings.Contains(string(out), "422 Validation Failed")
+			if str401 {
+				w.logger.Debug("ApplyAsync blocking request forever 401")
+				w.LastOperation.MarkStart(string(out))
 				return
 			}
+
+			if str403 {
+				w.logger.Debug("ApplyAsync blocking request forever 403")
+				w.LastOperation.MarkStart(string(out))
+				return
+			}
+
+			if str422 {
+				w.logger.Debug("ApplyAsync blocking request forever 422")
+				w.LastOperation.MarkStart(string(out))
+				return
+			}
+
 		}
 
 		if err != nil {
@@ -208,8 +224,52 @@ func (w *Workspace) Apply(ctx context.Context) (ApplyResult, error) {
 		return ApplyResult{}, errors.Errorf("%s operation that started at %s is still running", w.LastOperation.Type, w.LastOperation.StartTime().String())
 	}
 	out, err := w.runTF(ctx, ModeSync, "apply", "-auto-approve", "-input=false", "-lock=false", "-json")
+	// Hack to stop reconsilation
+	if out != nil {
+		str401 := strings.Contains(string(out), "401 Bad credentials")
+		str403 := strings.Contains(string(out), "403 API rate limit")
+		str422 := strings.Contains(string(out), "422 Validation Failed")
+		if str401 {
+			w.logger.Debug("Apply blocking request forever 401")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
+
+		if str403 {
+			w.logger.Debug("Apply blocking request forever 403")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
+
+		if str422 {
+			w.logger.Debug("Apply blocking request forever 422")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
+	}
+
 	w.logger.Debug("apply ended", "out", w.filterFn(string(out)))
 	if err != nil {
+		str401 := strings.Contains(err.Error(), "401 Bad credentials")
+		str403 := strings.Contains(err.Error(), "403 API rate limit")
+		str422 := strings.Contains(err.Error(), "422 Validation Failed")
+		if str401 {
+			w.logger.Debug("Apply blocking request forever 401")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
+
+		if str403 {
+			w.logger.Debug("Apply blocking request forever 403")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
+
+		if str422 {
+			w.logger.Debug("Apply blocking request forever 422")
+			w.LastOperation.MarkStart(string(out))
+			return ApplyResult{}, nil
+		}
 		return ApplyResult{}, tferrors.NewApplyFailed(out)
 	}
 	raw, err := w.fs.ReadFile(filepath.Join(w.dir, "terraform.tfstate"))
@@ -290,19 +350,65 @@ func (w *Workspace) Refresh(ctx context.Context) (RefreshResult, error) {
 
 	out, err := w.runTF(ctx, ModeSync, "apply", "-refresh-only", "-auto-approve", "-input=false", "-lock=false", "-json")
 
-	// Hack to stop reconsilation
+	// Hack to stop apply to terraform
 	if out != nil {
-		if strings.Contains(string(out), "401 Bad credentials") || strings.Contains(string(out), "403 API rate limit") {
-			w.logger.Debug("blocking ")
-			w.LastOperation.MarkStart("END 401 Bad credentials or 403 API rate limit ")
+		str401 := strings.Contains(string(out), "401 Bad credentials")
+		str403 := strings.Contains(string(out), "403 API rate limit")
+		str422 := strings.Contains(string(out), "422 Validation Failed")
+
+		if str401 {
+			w.logger.Debug("Refresh out blocking request forever 401")
+			w.LastOperation.MarkStart(string(out))
 			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
 				Reason: metav1.StatusReasonUnauthorized,
 			}}
 		}
+
+		if str403 {
+			w.logger.Debug("Refresh out blocking request forever 403")
+			w.LastOperation.MarkStart(string(out))
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Reason: metav1.StatusReasonUnauthorized,
+			}}
+		}
+
+		if str422 {
+			w.logger.Debug("Refresh out blocking request forever 422")
+			w.LastOperation.MarkStart(string(out))
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Message: "webhook probably already exists - 422 - magickey",
+			}}
+		}
 	}
 
-	w.logger.Debug("refresh ended", "out", w.filterFn(string(out)))
 	if err != nil {
+		str401 := strings.Contains(err.Error(), "401 Bad credentials")
+		str403 := strings.Contains(err.Error(), "403 API rate limit")
+		str422 := strings.Contains(err.Error(), "422 Validation Failed")
+
+		if str401 {
+			w.logger.Debug("Refresh err blocking request forever 401")
+			w.LastOperation.MarkStart(err.Error())
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Reason: metav1.StatusReasonUnauthorized,
+			}}
+		}
+
+		if str403 {
+			w.logger.Debug("Refresh err blocking request forever 403")
+			w.LastOperation.MarkStart(err.Error())
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Reason: metav1.StatusReasonUnauthorized,
+			}}
+		}
+		if str422 {
+			w.logger.Debug("Refresh err blocking request forever 422")
+			w.LastOperation.MarkStart(err.Error())
+			return RefreshResult{}, &k8serrors.StatusError{ErrStatus: metav1.Status{
+				Message: "webhook probably already exists - 422 - magickey",
+			}}
+		}
+
 		return RefreshResult{}, tferrors.NewRefreshFailed(out)
 	}
 

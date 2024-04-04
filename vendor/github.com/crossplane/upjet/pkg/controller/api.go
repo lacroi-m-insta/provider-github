@@ -98,6 +98,7 @@ func (ac *APICallbacks) callbackFn(name, op string, requeue bool) terraform.Call
 		if kErr := ac.kube.Get(ctx, nn, tr); kErr != nil {
 			return errors.Wrapf(kErr, errGetFmt, tr.GetObjectKind().GroupVersionKind().String(), name, op)
 		}
+
 		tr.SetConditions(resource.LastAsyncOperationCondition(err))
 		tr.SetConditions(resource.AsyncOperationFinishedCondition())
 		uErr := errors.Wrapf(ac.kube.Status().Update(ctx, tr), errUpdateStatusFmt, tr.GetObjectKind().GroupVersionKind().String(), name, op)

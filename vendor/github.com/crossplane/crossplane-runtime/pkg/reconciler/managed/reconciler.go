@@ -903,6 +903,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, req reconcile.Request) (resu
 
 	observation, err := external.Observe(externalCtx, managed)
 	if err != nil {
+
+		if err.Error() == "webhook probably already exists - 422 - magickey" {
+			log.Debug("Successfully hacked the case of an already existing resource", "error", err)
+			return reconcile.Result{Requeue: false}, nil
+		}
+
 		// We'll usually hit this case if our Provider credentials are invalid
 		// or insufficient for observing the external resource type we're
 		// concerned with. If this is the first time we encounter this issue
